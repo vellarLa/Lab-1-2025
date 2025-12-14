@@ -1,0 +1,5 @@
+prefect>=3.6.6
+minio>=7.2.20
+clickhouse-driver>=0.2.10
+requests>=2.31.0
+prefect-docker>=0.6.5

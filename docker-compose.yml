@@ -1,0 +1,46 @@
+services:
+  clickhouse-server:
+    image: clickhouse/clickhouse-server
+    container_name: clickhouse_bd-server
+    env_file:
+      - env/clickhouse.env
+    ports:
+      - "8123:8123"
+    volumes:
+      - ./project/clickhouse_bd:/docker-entrypoint-initdb.d
+  minio:
+    image: minio/minio
+    container_name: minio_client
+    env_file:
+      - env/minio.env
+    command: server /data --console-address ":9001"
+    ports:
+      - "9000:9000"
+      - "9001:9001"
+  prefect-server:
+    image: prefecthq/prefect:2-python3.11
+    command: prefect server start --host 0.0.0.0
+    ports:
+      - "4200:4200"
+    environment:
+      PREFECT_API_URL: http://prefect-server:4200/api
+
+  prefect-agent:
+    image: prefecthq/prefect:2-python3.11
+    command: >
+      sh -c "
+        pip install --no-cache-dir -r /opt/prefect/src/requirements.txt &&
+        prefect config set PREFECT_API_URL=http://prefect-server:4200/api &&
+        prefect work-pool create weather_deploy --type docker &&
+        prefect worker start --pool weather_deploy &&
+        python /opt/prefect/src/main.py
+      "
+    environment:
+      PREFECT_API_URL: http://prefect-server:4200/api
+    volumes:
+      - ./project:/opt/prefect/src
+      - ./requirements.txt:/opt/prefect/src/requirements.txt
+    depends_on:
+      - prefect-server
+      - clickhouse-server
+      - minio
